@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\OpenCqrs\OpenCqrs.csproj" />
+    <ProjectReference Include="..\OpenCqrs\OpenCqrs.csproj" />
   </ItemGroup>
 
 </Project>
