@@ -7,7 +7,7 @@ namespace OpenCqrs.Store.InMemory
 {
     public static class ServiceCollectionExtensions
     {
-        public static IOpenCqrsServiceBuilder AddSqlServerProvider(this IOpenCqrsServiceBuilder builder, IConfiguration configuration)
+        public static IOpenCqrsServiceBuilder AddInMemoryProvider(this IOpenCqrsServiceBuilder builder, IConfiguration configuration)
         {
             if (builder == null)
                 throw new ArgumentNullException(nameof(builder));
