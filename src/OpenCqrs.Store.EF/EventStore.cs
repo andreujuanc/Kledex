@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using OpenCqrs.Domain;
+using OpenCqrs.Exceptions;
 using OpenCqrs.Store.EF.Entities.Factories;
 
 namespace OpenCqrs.Store.EF
@@ -14,18 +15,21 @@ namespace OpenCqrs.Store.EF
         private readonly IDomainDbContextFactory _dbContextFactory;
         private readonly IAggregateEntityFactory _aggregateEntityFactory;
         private readonly IEventEntityFactory _eventEntityFactory;
+        private readonly IVersionService _versionService;
 
         public EventStore(IDomainDbContextFactory dbContextFactory,
             IAggregateEntityFactory aggregateEntityFactory,
-            IEventEntityFactory eventEntityFactory)
+            IEventEntityFactory eventEntityFactory, 
+            IVersionService versionService)
         {
             _dbContextFactory = dbContextFactory;
             _aggregateEntityFactory = aggregateEntityFactory;
-            _eventEntityFactory = eventEntityFactory;            
+            _eventEntityFactory = eventEntityFactory;
+            _versionService = versionService;
         }
 
         /// <inheritdoc />
-        public async Task SaveEventAsync<TAggregate>(IDomainEvent @event) where TAggregate : IAggregateRoot
+        public async Task SaveEventAsync<TAggregate>(IDomainEvent @event, int? expectedVersion) where TAggregate : IAggregateRoot
         {
             using (var dbContext = _dbContextFactory.CreateDbContext())
             {
@@ -36,8 +40,10 @@ namespace OpenCqrs.Store.EF
                     await dbContext.Aggregates.AddAsync(newAggregateEntity);
                 }
 
-                var currentSequenceCount = await dbContext.Events.CountAsync(x => x.AggregateId == @event.AggregateRootId);
-                var newEventEntity = _eventEntityFactory.CreateEvent(@event, currentSequenceCount + 1);
+                var currentVersion = await dbContext.Events.CountAsync(x => x.AggregateId == @event.AggregateRootId);
+                var nextVersion = _versionService.GetNextVersion(@event.AggregateRootId, currentVersion, expectedVersion);
+                var newEventEntity = _eventEntityFactory.CreateEvent(@event, nextVersion);
+
                 await dbContext.Events.AddAsync(newEventEntity);
 
                 await dbContext.SaveChangesAsync();
@@ -45,7 +51,7 @@ namespace OpenCqrs.Store.EF
         }
 
         /// <inheritdoc />
-        public void SaveEvent<TAggregate>(IDomainEvent @event) where TAggregate : IAggregateRoot
+        public void SaveEvent<TAggregate>(IDomainEvent @event, int? expectedVersion) where TAggregate : IAggregateRoot
         {
             using (var dbContext = _dbContextFactory.CreateDbContext())
             {
@@ -56,8 +62,10 @@ namespace OpenCqrs.Store.EF
                     dbContext.Aggregates.Add(newAggregateEntity);
                 }
 
-                var currentSequenceCount = dbContext.Events.Count(x => x.AggregateId == @event.AggregateRootId);
-                var newEventEntity = _eventEntityFactory.CreateEvent(@event, currentSequenceCount + 1);
+                var currentVersion = dbContext.Events.Count(x => x.AggregateId == @event.AggregateRootId);
+                var nextVersion = _versionService.GetNextVersion(@event.AggregateRootId, currentVersion, expectedVersion);
+                var newEventEntity = _eventEntityFactory.CreateEvent(@event, nextVersion);
+
                 dbContext.Events.Add(newEventEntity);
 
                 dbContext.SaveChanges();

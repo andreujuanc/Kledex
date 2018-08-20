@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Newtonsoft.Json;
 using OpenCqrs.Domain;
+using OpenCqrs.Exceptions;
 using OpenCqrs.Store.CosmosDB.MongoDB.Configuration;
 using OpenCqrs.Store.CosmosDB.MongoDB.Documents;
 using OpenCqrs.Store.CosmosDB.MongoDB.Documents.Factories;
@@ -16,17 +17,20 @@ namespace OpenCqrs.Store.CosmosDB.MongoDB
         private readonly DomainDbContext _dbContext;
         private readonly IAggregateDocumentFactory _aggregateDocumentFactory;
         private readonly IEventDocumentFactory _eventDocumentFactory;
+        private readonly IVersionService _versionService;
 
         public EventStore(IOptions<DomainDbConfiguration> settings, 
             IAggregateDocumentFactory aggregateDocumentFactory, 
-            IEventDocumentFactory eventDocumentFactory)
+            IEventDocumentFactory eventDocumentFactory, 
+            IVersionService versionService)
         {
             _dbContext = new DomainDbContext(settings);
             _aggregateDocumentFactory = aggregateDocumentFactory;
             _eventDocumentFactory = eventDocumentFactory;
+            _versionService = versionService;
         }
 
-        public async Task SaveEventAsync<TAggregate>(IDomainEvent @event) where TAggregate : IAggregateRoot
+        public async Task SaveEventAsync<TAggregate>(IDomainEvent @event, int? expectedVersion) where TAggregate : IAggregateRoot
         {
             var aggregateFilter = Builders<AggregateDocument>.Filter.Eq("_id", @event.AggregateRootId.ToString());
             var aggregate = await _dbContext.Aggregates.Find(aggregateFilter).FirstOrDefaultAsync();
@@ -37,12 +41,15 @@ namespace OpenCqrs.Store.CosmosDB.MongoDB
             }
 
             var eventFilter = Builders<EventDocument>.Filter.Eq("aggregateId", @event.AggregateRootId.ToString());
-            var currentVersion = await _dbContext.Events.Find(eventFilter).CountAsync();
-            var eventDocument = _eventDocumentFactory.CreateEvent(@event, currentVersion + 1);
+            var currentVersion = await _dbContext.Events.Find(eventFilter).CountDocumentsAsync();
+            var nextVersion = _versionService.GetNextVersion(@event.AggregateRootId, (int)currentVersion, expectedVersion);
+
+            var eventDocument = _eventDocumentFactory.CreateEvent(@event, nextVersion);
+
             await _dbContext.Events.InsertOneAsync(eventDocument);
         }
 
-        public void SaveEvent<TAggregate>(IDomainEvent @event) where TAggregate : IAggregateRoot
+        public void SaveEvent<TAggregate>(IDomainEvent @event, int? expectedVersion) where TAggregate : IAggregateRoot
         {
             var aggregateFilter = Builders<AggregateDocument>.Filter.Eq("_id", @event.AggregateRootId.ToString());
             var aggregate = _dbContext.Aggregates.Find(aggregateFilter).FirstOrDefault();
@@ -53,8 +60,11 @@ namespace OpenCqrs.Store.CosmosDB.MongoDB
             }
 
             var eventFilter = Builders<EventDocument>.Filter.Eq("aggregateId", @event.AggregateRootId.ToString());
-            var currentVersion = _dbContext.Events.Find(eventFilter).Count();
-            var eventDocument = _eventDocumentFactory.CreateEvent(@event, currentVersion + 1);
+            var currentVersion = _dbContext.Events.Find(eventFilter).CountDocuments();
+            var nextVersion = _versionService.GetNextVersion(@event.AggregateRootId, (int)currentVersion, expectedVersion);
+
+            var eventDocument = _eventDocumentFactory.CreateEvent(@event, nextVersion);
+
             _dbContext.Events.InsertOne(eventDocument);
         }
 
