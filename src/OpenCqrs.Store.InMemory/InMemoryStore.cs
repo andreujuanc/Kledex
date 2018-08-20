@@ -14,6 +14,12 @@ namespace OpenCqrs.Store.InMemory
         private List<CommandDocument> Commands { get; } = new List<CommandDocument>();
         private List<AggregateDocument> Aggregates { get; } = new List<AggregateDocument>();
         private List<EventDocument> Events { get; } = new List<EventDocument>();
+        private readonly IVersionService VersionService;
+
+        public InMemoryStore(IVersionService versionService)
+        {
+            VersionService = versionService;
+        }
 
         public IEnumerable<DomainCommand> GetCommands(Guid aggregateId)
         {
@@ -81,23 +87,25 @@ namespace OpenCqrs.Store.InMemory
             return result;
         }
 
-        public void SaveEvent<TAggregate>(IDomainEvent @event) where TAggregate : IAggregateRoot
+        public void SaveEvent<TAggregate>(IDomainEvent @event, int? expectedVersion = null) where TAggregate : IAggregateRoot
         {
             throw new NotImplementedException();
         }
 
-        public async Task SaveEventAsync<TAggregate>(IDomainEvent @event) where TAggregate : IAggregateRoot
+        public async Task SaveEventAsync<TAggregate>(IDomainEvent @event, int? expectedVersion = null) where TAggregate : IAggregateRoot
         {
             await Task.CompletedTask;
             EnsureAggregateExists<TAggregate>(@event.AggregateRootId);
 
             var currentVersion = Events.Where(x => x.AggregateId == @event.AggregateRootId).Count();
+            var nextVersion = VersionService.GetNextVersion(@event.AggregateRootId, currentVersion, expectedVersion);
+
             var eventDocument = new EventDocument()
             {
                 Id = @event.Id,
                 AggregateId = @event.AggregateRootId,
                 CommandId = @event.CommandId,
-                Sequence = currentVersion + 1,
+                Sequence = nextVersion,
                 Type = @event.GetType().AssemblyQualifiedName,
                 Data = JsonConvert.SerializeObject(@event),
                 TimeStamp = @event.TimeStamp,

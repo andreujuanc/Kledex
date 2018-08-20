@@ -18,7 +18,7 @@ namespace OpenCqrs.Store.InMemory
             if (configuration == null)
                 throw new ArgumentNullException(nameof(configuration));
 
-            var store = new InMemoryStore();
+            var store = new InMemoryStore(new VersionService());// todo
             var busdistpacher = new InMemoryBusMessageDispatcher();
 
             builder.Services.AddSingleton<IEventStore>((sp) => store);
