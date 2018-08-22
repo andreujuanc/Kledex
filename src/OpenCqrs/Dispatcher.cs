@@ -30,6 +30,13 @@ namespace OpenCqrs
             _busMessageDispatcher = busMessageDispatcher;
         }
 
+
+        public Task SendAsyncWOOT(ICommand command)
+        {
+            return _commandSender.SendAsyncWOOT(command);
+        }
+
+
         /// <inheritdoc />
         public Task SendAsync<TCommand>(TCommand command) where TCommand : ICommand
         {

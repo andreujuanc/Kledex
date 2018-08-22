@@ -16,7 +16,7 @@ namespace OpenCqrs.Store.CosmosDB.MongoDB
         private readonly DomainDbContext _dbContext;
         private readonly IAggregateDocumentFactory _aggregateDocumentFactory;
         private readonly ICommandDocumentFactory _commandDocumentFactory;
-
+         
         public CommandStore(IOptions<DomainDbConfiguration> settings, 
             IAggregateDocumentFactory aggregateDocumentFactory, 
             ICommandDocumentFactory commandDocumentFactory)
@@ -24,6 +24,21 @@ namespace OpenCqrs.Store.CosmosDB.MongoDB
             _dbContext = new DomainDbContext(settings);
             _aggregateDocumentFactory = aggregateDocumentFactory;
             _commandDocumentFactory = commandDocumentFactory;
+        }
+
+
+        public async Task SaveCommandAsync<TAggregate>(IDomainCommand<TAggregate> command) where TAggregate : IAggregateRoot
+        {
+            var aggregateFilter = Builders<AggregateDocument>.Filter.Eq("_id", command.AggregateRootId.ToString());
+            var aggregate = await _dbContext.Aggregates.Find(aggregateFilter).FirstOrDefaultAsync();
+            if (aggregate == null)
+            {
+                var aggregateDocument = _aggregateDocumentFactory.CreateAggregate<TAggregate>(command.AggregateRootId);
+                await _dbContext.Aggregates.InsertOneAsync(aggregateDocument);
+            }
+
+            var commandDocument = _commandDocumentFactory.CreateCommand(command);
+            await _dbContext.Commands.InsertOneAsync(commandDocument);
         }
 
         public async Task SaveCommandAsync<TAggregate>(IDomainCommand command) where TAggregate : IAggregateRoot
@@ -39,6 +54,10 @@ namespace OpenCqrs.Store.CosmosDB.MongoDB
             var commandDocument = _commandDocumentFactory.CreateCommand(command);
             await _dbContext.Commands.InsertOneAsync(commandDocument);
         }
+
+
+
+
 
         public void SaveCommand<TAggregate>(IDomainCommand command) where TAggregate : IAggregateRoot
         {
@@ -85,5 +104,7 @@ namespace OpenCqrs.Store.CosmosDB.MongoDB
 
             return result;
         }
+
+    
     }
 }

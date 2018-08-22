@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using OpenCqrs.Dependencies;
 using OpenCqrs.Domain;
 using OpenCqrs.Events;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace OpenCqrs.Commands
 {
@@ -31,7 +33,44 @@ namespace OpenCqrs.Commands
             _handlerResolver = handlerResolver;
         }
 
-        /// <inheritdoc />
+        public Task SaveCommand<TAggregate>(IDomainCommand<TAggregate> command) where TAggregate : IAggregateRoot
+        {
+            return _commandStore.SaveCommandAsync<TAggregate>(command);
+        }
+
+        public async Task SendAsyncUsingBlackMagic<TCommand>(TCommand command) where TCommand : ICommand
+        {
+            if (command == null)
+                throw new ArgumentNullException(nameof(command));
+
+            if (command is IDomainCommand<IAggregateRoot> domainCommand)
+            {
+                var commandType = domainCommand.GetType();
+                var domainInterface = commandType.GetInterfaces()[0]; //TODO KEK
+                var aggregateType = domainInterface.GetGenericArguments().FirstOrDefault(); //TODO Filter by IAggregateRoot
+                var handlerType = typeof(ICommandHandlerWithDomainEventsAsyncWOOT<>).MakeGenericType(command.GetType());
+
+                Func<IDomainCommand<IAggregateRoot>, Task> SaveCommandName = SaveCommand<IAggregateRoot>;
+                var SaveCommandMethod = this.GetType().GetMethod(SaveCommandName.Method.Name);
+                var SaveCommandMethodGeneric = SaveCommandMethod.MakeGenericMethod(aggregateType);
+                await (Task) SaveCommandMethodGeneric.Invoke(this, new object[] { domainCommand } );
+
+                var handler = _handlerResolver.ResolveHandler(handlerType);
+                var handleMethod = handlerType.GetMethod("HandleAsync");
+                var events = await (Task<IEnumerable<IDomainEvent>>)handleMethod.Invoke(handler, new object[] { domainCommand }) ;
+                
+                foreach (var @event in events)
+                {
+                    @event.Update(domainCommand);
+                    var concreteEvent = _eventFactory.CreateConcreteEvent(@event);
+                   // TODO await _eventStore.SaveEventAsync<TAggregate>((IDomainEvent)concreteEvent, command.ExpectedVersion);
+                    await _eventPublisher.PublishAsync(concreteEvent);
+                }
+            }           
+        }
+
+
+            /// <inheritdoc />
         public Task SendAsync<TCommand>(TCommand command) where TCommand : ICommand
         {
             if (command == null)

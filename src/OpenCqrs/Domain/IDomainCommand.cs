@@ -3,7 +3,12 @@ using OpenCqrs.Commands;
 
 namespace OpenCqrs.Domain
 {
-    public interface IDomainCommand : ICommand
+    public interface IDomainCommand<out TAggregateRoot> : IDomainCommand, ICommand where TAggregateRoot : IAggregateRoot
+    {
+    
+    }
+
+    public interface IDomainCommand : ICommand 
     {
         Guid Id { get; set; }
         Guid AggregateRootId { get; set; }

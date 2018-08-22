@@ -8,6 +8,10 @@ namespace OpenCqrs.Commands
     /// </summary>
     public interface ICommandSender
     {
+
+        Task SendAsyncWOOT<TCommand>(TCommand command) where TCommand : ICommand;
+
+
         /// <summary>
         /// Asynchronously sends the specified command.
         /// The command handler must implement OpenCqrs.Commands.ICommandHandlerAsync&lt;TCommand&gt;.

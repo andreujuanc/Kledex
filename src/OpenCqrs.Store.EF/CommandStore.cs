@@ -24,6 +24,24 @@ namespace OpenCqrs.Store.EF
             _commandEntityFactory = commandEntityFactory;            
         }
 
+        public async Task SaveCommandAsync<TAggregate>(IDomainCommand<TAggregate> command) where TAggregate : IAggregateRoot
+        {
+            using (var dbContext = _dbContextFactory.CreateDbContext())
+            {
+                var aggregateEntity = await dbContext.Aggregates.FirstOrDefaultAsync(x => x.Id == command.AggregateRootId);
+                if (aggregateEntity == null)
+                {
+                    var newAggregateEntity = _aggregateEntityFactory.CreateAggregate<TAggregate>(command.AggregateRootId);
+                    await dbContext.Aggregates.AddAsync(newAggregateEntity);
+                }
+
+                var newCommandEntity = _commandEntityFactory.CreateCommand(command);
+                await dbContext.Commands.AddAsync(newCommandEntity);
+
+                await dbContext.SaveChangesAsync();
+            }
+        }
+
         /// <inheritdoc />
         public async Task SaveCommandAsync<TAggregate>(IDomainCommand command) where TAggregate : IAggregateRoot
         {
@@ -97,5 +115,7 @@ namespace OpenCqrs.Store.EF
 
             return result;
         }
+
+      
     }
 }

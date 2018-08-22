@@ -6,6 +6,10 @@ namespace OpenCqrs.Domain
 {
     public interface ICommandStore
     {
+
+        Task SaveCommandAsync<TAggregate>(IDomainCommand<TAggregate> command)
+            where TAggregate : IAggregateRoot;
+
         /// <summary>
         /// Saves the command asynchronously.
         /// </summary>

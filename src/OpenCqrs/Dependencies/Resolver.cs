@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +17,11 @@ namespace OpenCqrs.Dependencies
         public T Resolve<T>()
         {
             return _httpContextAccessor.HttpContext.RequestServices.GetService<T>();
+        }
+
+        public object Resolve(Type handlerType)
+        {
+            return _httpContextAccessor.HttpContext.RequestServices.GetService(handlerType);
         }
 
         public IEnumerable<T> ResolveAll<T>()

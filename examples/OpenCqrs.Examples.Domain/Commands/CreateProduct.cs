@@ -2,7 +2,7 @@
 
 namespace OpenCqrs.Examples.Domain.Commands
 {
-    public class CreateProduct : DomainCommand
+    public class CreateProduct : DomainCommand<Product>
     {
         public string Title { get; set; }
     }

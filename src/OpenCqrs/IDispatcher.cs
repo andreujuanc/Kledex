@@ -12,6 +12,11 @@ namespace OpenCqrs
     /// </summary>
     public interface IDispatcher
     {
+
+
+        Task SendAsyncWOOT(ICommand command);
+
+
         /// <summary>
         /// Asynchronously sends the specified command.
         /// The command handler must implement OpenCqrs.Commands.ICommandHandlerAsync&lt;TCommand&gt;.

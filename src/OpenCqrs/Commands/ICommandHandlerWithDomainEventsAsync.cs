@@ -8,4 +8,11 @@ namespace OpenCqrs.Commands
     {
         Task<IEnumerable<IDomainEvent>> HandleAsync(TCommand command);
     }
+
+
+    public interface ICommandHandlerWithDomainEventsAsyncWOOT<TCommand> 
+            where TCommand : IDomainCommand<IAggregateRoot>
+    {
+        Task<IEnumerable<IDomainEvent>> HandleAsync(TCommand command);
+    }
 }

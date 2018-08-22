@@ -27,6 +27,19 @@ namespace OpenCqrs.Store.CosmosDB.Sql
             _commandDocumentFactory = commandDocumentFactory;
         }
 
+        public async Task SaveCommandAsync<TAggregate>(IDomainCommand<TAggregate> command) where TAggregate : IAggregateRoot
+        {
+            var aggregateDocument = await _aggregateRepository.GetDocumentAsync(command.AggregateRootId.ToString());
+            if (aggregateDocument == null)
+            {
+                var newAggregateDocument = _aggregateDocumentFactory.CreateAggregate<TAggregate>(command.AggregateRootId);
+                await _aggregateRepository.CreateDocumentAsync(newAggregateDocument);
+            }
+
+            var commandDocument = _commandDocumentFactory.CreateCommand(command);
+            await _commandRepository.CreateDocumentAsync(commandDocument);
+        }
+
         public async Task SaveCommandAsync<TAggregate>(IDomainCommand command) where TAggregate : IAggregateRoot
         {
             var aggregateDocument = await _aggregateRepository.GetDocumentAsync(command.AggregateRootId.ToString());
@@ -82,5 +95,7 @@ namespace OpenCqrs.Store.CosmosDB.Sql
 
             return result;
         }
+
+   
     }
 }
