@@ -1,4 +1,6 @@
-﻿namespace OpenCqrs.Bus.RabbitMQ.Factories
+﻿using RabbitMQ.Client;
+
+namespace OpenCqrs.Bus.RabbitMQ.Factories
 {
     /// <summary>
     /// IMessageFactory
@@ -12,5 +14,6 @@
         /// <param name="message">The message.</param>
         /// <returns></returns>
         byte[] CreateMessage<TMessage>(TMessage message) where TMessage : IBusMessage;
+        void CreateProperties<TMessage>(TMessage message, IBasicProperties properties) where TMessage : IBusTopicMessage;
     }
 }
