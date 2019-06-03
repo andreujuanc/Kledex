@@ -8,5 +8,6 @@
         public string AggregateCollectionId { get; set; }
         public string CommandCollectionId { get; set; }
         public string EventCollectionId { get; set; }
+        public bool EnablePartitioningByType { get; set; }
     }
 }

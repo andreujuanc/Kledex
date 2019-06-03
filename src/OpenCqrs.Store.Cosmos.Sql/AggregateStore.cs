@@ -10,7 +10,7 @@ using OpenCqrs.Store.Cosmos.Sql.Repositories;
 namespace OpenCqrs.Store.Cosmos.Sql
 {
     /// <inheritdoc />
-    internal class AggregateStore : IAggregateStore
+    public class AggregateStore : IAggregateStore
     {
         private readonly IDocumentRepository<AggregateDocument> _aggregateRepository;
         private readonly IAggregateDocumentFactory _aggregateDocumentFactory;

@@ -11,29 +11,44 @@ using OpenCqrs.Store.Cosmos.Sql.Configuration;
 
 namespace OpenCqrs.Store.Cosmos.Sql.Repositories
 {
-    internal abstract class BaseDocumentRepository<TDocument> : IDocumentRepository<TDocument> where TDocument : class
+    public abstract class BaseDocumentRepository<TDocument> : IDocumentRepository<TDocument> where TDocument : class
     {
         private readonly IDocumentClient _documentClient;
         private readonly string _databaseId;
         private readonly string _collectionId;
+        private readonly string _partitionKey;
+        private readonly bool _enablePartitioningByType;
 
         protected BaseDocumentRepository(string collectionId, IDocumentClient documentClient, IOptions<DomainDbConfiguration> settings)
         {
             _documentClient = documentClient;
             _databaseId = settings.Value.DatabaseId;
             _collectionId = collectionId;
+            _enablePartitioningByType = settings.Value.EnablePartitioningByType;
+            _partitionKey = settings.Value.EnablePartitioningByType ? "/type" : null;//Must match with the attribute [JsonProperty(PropertyName = "type")] on the documents 
+            
         }
 
         public async Task<Document> CreateDocumentAsync(TDocument document)
         {
-            return await _documentClient.CreateDocumentAsync(GetUri(), document);
+            return await _documentClient.CreateDocumentAsync(GetUri(), document
+            /*, new RequestOptions()
+            {
+                 PartitionKey = GetPartitionKey()
+            }*/
+            );
         }
 
-        public async Task<TDocument> GetDocumentAsync(string documentId)
+        public async Task<TDocument> GetDocumentAsync(string documentId, string partitionKeyValue = null)
         {
             try
             {
-                Document document = await _documentClient.ReadDocumentAsync(GetUri(documentId));
+                var options = new RequestOptions()
+                {
+                    PartitionKey = GetPartitionKey(partitionKeyValue)
+                };
+                
+                Document document = await _documentClient.ReadDocumentAsync(GetUri(documentId), options);
                 return (TDocument)(dynamic)document;
             }
             catch (DocumentClientException e)
@@ -50,7 +65,7 @@ namespace OpenCqrs.Store.Cosmos.Sql.Repositories
         public async Task<IList<TDocument>> GetDocumentsAsync(Expression<Func<TDocument, bool>> predicate)
         {
             var query = _documentClient
-                .CreateDocumentQuery<TDocument>(GetUri(), new FeedOptions { MaxItemCount = -1 })
+                .CreateDocumentQuery<TDocument>(GetUri(), new FeedOptions { MaxItemCount = -1, PartitionKey = GetPartitionKey(""), EnableCrossPartitionQuery = _enablePartitioningByType })
                 .Where(predicate)
                 .AsDocumentQuery();
 
@@ -67,16 +82,24 @@ namespace OpenCqrs.Store.Cosmos.Sql.Repositories
         public Task<int> GetCountAsync(Expression<Func<TDocument, bool>> predicate)
         {
             return _documentClient
-                .CreateDocumentQuery<TDocument>(GetUri())
+                .CreateDocumentQuery<TDocument>(GetUri(), new FeedOptions() { PartitionKey = GetPartitionKey("") , EnableCrossPartitionQuery = _enablePartitioningByType})
                 .Where(predicate)
                 .CountAsync();
         }
 
         private Uri GetUri(string documentId = "")
         {
-            return !string.IsNullOrEmpty(documentId) 
-                ? UriFactory.CreateDocumentUri(_databaseId, _collectionId, documentId) 
+            return !string.IsNullOrEmpty(documentId)
+                ? UriFactory.CreateDocumentUri(_databaseId, _collectionId, documentId)
                 : UriFactory.CreateDocumentCollectionUri(_databaseId, _collectionId);
+        }
+
+        private PartitionKey GetPartitionKey(string partitionKeyValue)
+        {
+            if (_enablePartitioningByType)
+                return new PartitionKey(partitionKeyValue);
+            else
+                return null;
         }
     }
 }

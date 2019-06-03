@@ -15,9 +15,9 @@ namespace OpenCqrs.Store.Cosmos.Sql.Extensions
             var documentClient = builder.App.ApplicationServices.GetService<IDocumentClient>();
 
             CreateDatabaseIfNotExistsAsync(documentClient, settings.Value.DatabaseId).Wait();
-            CreateCollectionIfNotExistsAsync(documentClient, settings.Value.DatabaseId, settings.Value.AggregateCollectionId).Wait();
-            CreateCollectionIfNotExistsAsync(documentClient, settings.Value.DatabaseId, settings.Value.CommandCollectionId).Wait();
-            CreateCollectionIfNotExistsAsync(documentClient, settings.Value.DatabaseId, settings.Value.EventCollectionId).Wait();
+            CreateCollectionIfNotExistsAsync(documentClient, settings.Value.DatabaseId, settings.Value.AggregateCollectionId, settings.Value.EnablePartitioningByType).Wait();
+            CreateCollectionIfNotExistsAsync(documentClient, settings.Value.DatabaseId, settings.Value.CommandCollectionId, settings.Value.EnablePartitioningByType).Wait();
+            CreateCollectionIfNotExistsAsync(documentClient, settings.Value.DatabaseId, settings.Value.EventCollectionId, settings.Value.EnablePartitioningByType).Wait();
 
             return builder;
         }
@@ -41,7 +41,7 @@ namespace OpenCqrs.Store.Cosmos.Sql.Extensions
             }
         }
 
-        private static async Task CreateCollectionIfNotExistsAsync(IDocumentClient documentClient, string databaseId, string collectionId)
+        private static async Task CreateCollectionIfNotExistsAsync(IDocumentClient documentClient, string databaseId, string collectionId, bool enablePartitioningByType)
         {
             try
             {
@@ -51,16 +51,35 @@ namespace OpenCqrs.Store.Cosmos.Sql.Extensions
             {
                 if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    await documentClient.CreateDocumentCollectionAsync(
+                    var collection = new DocumentCollection { Id = collectionId };
+                    var requestOptions = new RequestOptions { OfferThroughput = 1000 };
+
+                    if (enablePartitioningByType)
+                    {
+                        collection.PartitionKey = GetPartitionKeyDefinition(enablePartitioningByType);
+                    }
+
+                    await documentClient.CreateDocumentCollectionAsync
+                    (
                         UriFactory.CreateDatabaseUri(databaseId),
-                        new DocumentCollection { Id = collectionId },
-                        new RequestOptions { OfferThroughput = 1000 });
+                        collection,
+                        requestOptions
+                    );
                 }
                 else
                 {
                     throw;
                 }
             }
+        }
+
+        private static PartitionKeyDefinition GetPartitionKeyDefinition(bool enablePartitioningByType)
+        {
+            var partitionKeyDefinition= new PartitionKeyDefinition();
+            if(enablePartitioningByType)
+                partitionKeyDefinition.Paths.Add("/type");
+
+            return partitionKeyDefinition;
         }
     }
 }
